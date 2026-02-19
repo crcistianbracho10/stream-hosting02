@@ -1,11 +1,31 @@
 const { spawn, exec } = require('child_process');
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 const port = process.env.PORT || 3000;
 
 // URL RAW DE TU PLAYLIST EN GIST
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
+
+// Ruta al binario ffmpeg dentro del proyecto
+const ffmpegPath = path.join(__dirname, 'ffmpeg.exe');
+
+// Descargar ffmpeg.exe desde Dropbox si no existe
+async function asegurarFFmpeg() {
+    if (!fs.existsSync(ffmpegPath)) {
+        console.log("📥 Descargando ffmpeg.exe desde Dropbox...");
+        await new Promise((resolve, reject) => {
+            exec('curl -L -o ffmpeg.exe "https://www.dropbox.com/scl/fi/31m8s2t34n44izgi2wiqb/ffmpeg.exe?rlkey=hj4hv3yp4ntfpjynam2sio3d9&st=xfd6s1uh&dl=1"', (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    } else {
+        console.log("✅ ffmpeg.exe ya está disponible en el proyecto");
+    }
+}
 
 // FUNCIÓN PARA DESCARGAR LA PLAYLIST SIEMPRE ACTUALIZADA
 async function obtenerPlaylist() {
@@ -42,6 +62,9 @@ const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_3
 async function iniciarMotor() {
     console.log("🚀 Iniciando Transmisión Canal C Full HD...");
 
+    // Asegurar ffmpeg.exe
+    await asegurarFFmpeg();
+
     // DESCARGAR LOGO
     console.log("Descargando logo...");
     await new Promise((resolve) => {
@@ -72,13 +95,11 @@ async function iniciarMotor() {
             const usarCanal11 = esHorarioCanal11();
             const moverLogoDerecha = esSeisAM();
 
-            // Caso especial Canal 11
             if (usarCanal11) {
                 console.log("📺 Horario Canal 11 del Zulia activo (6am–8am VE)");
                 videoURL = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
             }
 
-            // Evitar repetir consecutivamente
             if (!usarCanal11 && videoURL === ultimoVideo) {
                 console.log("⏭️ Ya se transmitió este video, pasando al siguiente...");
                 continue;
@@ -86,17 +107,13 @@ async function iniciarMotor() {
 
             console.log(`🎥 Preparando transmisión: ${item.title}`);
 
-            // POSICIÓN DEL LOGO
-            let xLogo = 180; // más aire respecto al borde izquierdo
-            let yLogo = 70;  // más aire respecto al borde superior
+            let xLogo = 180;
+            let yLogo = 70;
 
-            if (usarCanal11) {
-                xLogo = "W-w-180"; // mover al lado derecho en Canal 11
-            } else if (moverLogoDerecha) {
-                xLogo = "W-w-180"; // mover a la derecha a las 6am
+            if (usarCanal11 || moverLogoDerecha) {
+                xLogo = "W-w-180";
             }
 
-            // Filtro FFmpeg
             let filtro = "";
             filtro += "[0:v]scale=1920:1080,setsar=1[base];";
             filtro += "[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];";
@@ -105,40 +122,39 @@ async function iniciarMotor() {
             if (usarCanal11) {
                 filtro += ";[outv]drawtext=text='Cortesía Canal 11 del Zulia':";
                 filtro += "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:";
-                filtro += "x=W-tw-40:y=H-th-40[outv2]"; // esquina inferior derecha
+                filtro += "x=W-tw-40:y=H-th-40[outv2]";
                 filtro += ";[outv2]format=yuv420p[outv_final]";
             } else {
                 filtro += ";[outv]format=yuv420p[outv_final]";
             }
 
             const ffmpegArgs = [
-    '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-    '-i', videoURL,
-    '-i', 'logo.png',
-    '-filter_complex', filtro,
-    '-map', '[outv_final]',
-    '-map', '0:a?',
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',   // antes "fast" → menos CPU, más compresión
-    '-tune', 'zerolatency',
-    '-b:v', '2500k',         // antes 4000k → baja bitrate de video
-    '-maxrate', '2500k',     // límite máximo de bitrate
-    '-bufsize', '5000k',     // buffer proporcional
-    '-pix_fmt', 'yuv420p',
-    '-g', '60',
-    '-c:a', 'aac',
-    '-b:a', '96k',           // antes 128k → audio más ligero
-    '-ar', '44100',          // antes 48000 → frecuencia más baja
-    '-s', '1280x720',        // antes 1920x1080 → baja resolución a HD estándar
-];
+                '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+                '-i', videoURL,
+                '-i', 'logo.png',
+                '-filter_complex', filtro,
+                '-map', '[outv_final]',
+                '-map', '0:a?',
+                '-c:v', 'libx264',
+                '-preset', 'veryfast',
+                '-tune', 'zerolatency',
+                '-b:v', '2500k',
+                '-maxrate', '2500k',
+                '-bufsize', '5000k',
+                '-pix_fmt', 'yuv420p',
+                '-g', '60',
+                '-c:a', 'aac',
+                '-b:a', '96k',
+                '-ar', '44100',
+                '-s', '1280x720',
+                '-f', 'flv', RTMP_DESTINO
+            ];
 
             if (duracion > 0) {
                 ffmpegArgs.push("-t", String(duracion));
             }
 
-            ffmpegArgs.push('-f', 'flv', RTMP_DESTINO);
-
-            const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+            const ffmpeg = spawn(ffmpegPath, ffmpegArgs);
 
             ffmpeg.stderr.on("data", data => {
                 const msg = data.toString();
@@ -151,10 +167,7 @@ async function iniciarMotor() {
             });
 
             await new Promise((resolve) => ffmpeg.on('close', resolve));
-
-            // Marcar último reproducido al cerrar
             ultimoVideo = videoURL;
-
             console.log("➡️ Video terminado, pasando al siguiente...");
         }
     }
