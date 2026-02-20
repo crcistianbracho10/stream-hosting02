@@ -4,9 +4,13 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// 📥 Playlist desde tu gist
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
+
+// 📡 RTMP destino (pegado exacto como pediste)
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
+// 🎬 Intro y stream de Canal 11
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
 
@@ -23,6 +27,7 @@ async function obtenerPlaylist() {
     }
 }
 
+// 🕒 Horario especial Canal 11: lunes a viernes, 6–8am y 1–3pm VE
 function esHorarioCanal11() {
     const ahora = new Date();
     const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4 Caracas
