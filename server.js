@@ -4,18 +4,13 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 📥 Playlist desde tu gist
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
-
-// 📡 RTMP destino
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
-// 🎬 Intro y stream de Canal 11
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
 
-// ✅ Logo local en la misma carpeta
-const LOGO_URL = "logo.png";
+const LOGO_URL = "logo.png"; // ✅ logo local en Render
 
 let motorActivo = false;
 
@@ -30,10 +25,9 @@ async function obtenerPlaylist() {
     }
 }
 
-// 🕒 Horario especial Canal 11: lunes a viernes, 6–8am y 1–3pm VE
 function esHorarioCanal11() {
     const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4 Caracas
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24;
     const minutoVE = ahora.getUTCMinutes();
     const dia = ahora.getUTCDay();
     const esDiaSemana = dia >= 1 && dia <= 5;
@@ -63,15 +57,15 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     filtro += "[outv]format=yuv420p[outv_final]";
 
     const ffmpegArgs = [];
-    if (esArchivo) ffmpegArgs.push('-re'); // ✅ solo para archivos
+    if (esArchivo) ffmpegArgs.push('-re'); // ✅ solo para archivos locales
 
     ffmpegArgs.push('-i', videoURL);
     if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
 
     ffmpegArgs.push(
         '-filter_complex', filtro,
-        '-map', '[outv_final]',      // ✅ salida de video procesada
-        '-map', '0:a?',              // ✅ salida de audio
+        '-map', '[outv_final]',
+        '-map', '0:a?',
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
@@ -79,7 +73,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-maxrate', '2000k',
         '-bufsize', '6000k',
         '-pix_fmt', 'yuv420p',
-        '-g', '60',                  // ✅ keyframe cada 2 seg
+        '-g', '60',
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
@@ -105,13 +99,13 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     });
 
     await new Promise(resolve => ffmpeg.on('close', resolve));
-    await new Promise(r => setTimeout(r, 3000)); // ✅ espera antes de relanzar
+    await new Promise(r => setTimeout(r, 3000));
 }
 
 async function iniciarMotor() {
     if (motorActivo) return;
     motorActivo = true;
-    console.log("🚀 Iniciando Transmisión Canal C Full HD...");
+    console.log("🚀 Iniciando Transmisión Canal C Full HD en Render...");
 
     let ultimoVideo = null;
 
@@ -149,7 +143,7 @@ async function iniciarMotor() {
             if (videoURL === ultimoVideo) continue;
 
             console.log(`🎥 Transmitiendo: ${item.title}`);
-            await transmitir(videoURL, duracion, true, true, false, false);
+            await transmitir(videoURL, duracion, true, false, false, false);
 
             ultimoVideo = videoURL;
             console.log("➡️ Video terminado, siguiente...");
@@ -158,13 +152,6 @@ async function iniciarMotor() {
     }
 }
 
-// 🚀 Arranca el motor automáticamente
 iniciarMotor();
 
-// 🌐 Endpoints Express
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
-
-// 📡 Servidor web
-app.listen(port, () => {
-    console.log(`Servidor Express escuchando en puerto ${port}`);
-});
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 
