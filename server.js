@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 // 📥 Playlist desde tu gist
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
 
-// 📡 RTMP destino (pegado exacto como pediste)
+// 📡 RTMP destino
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
 // 🎬 Intro y stream de Canal 11
@@ -71,7 +71,8 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     ffmpegArgs.push(
         '-filter_complex', filtro,
         '-map', '[outv_final]',
-        '-map', '0:a?',
+        '-map', '0:v?',              // ✅ asegura que siempre haya video
+        '-map', '0:a?',              // ✅ asegura que siempre haya audio
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
@@ -86,8 +87,8 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-ac', '2',
         '-async', '1',
         '-s', '1280x720',
-        '-rtmp_buffer', '1000',      // ✅ menos carga inicial
-        '-rtmp_live', 'live'         // ✅ modo live real
+        '-rtmp_buffer', '1000',
+        '-rtmp_live', 'live'
     );
 
     if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
@@ -105,6 +106,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     });
 
     await new Promise(resolve => ffmpeg.on('close', resolve));
+    await new Promise(r => setTimeout(r, 3000)); // ✅ espera antes de relanzar
 }
 
 async function iniciarMotor() {
