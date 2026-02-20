@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Transmisión Canal C</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    button { padding: 10px 20px; font-size: 18px; margin: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Canal C - Control de Transmisión</h1>
+  <button onclick="iniciar()">Iniciar Transmisión</button>
+  <button onclick="detener()">Detener Transmisión</button>
+  <p id="estado"></p>
+
+  <script>
+    async function iniciar() {
+      const res = await fetch('/start');
+      const texto = await res.text();
+      document.getElementById('estado').innerText = texto;
+    }
+    async function detener() {
+      const res = await fetch('/stop');
+      const texto = await res.text();
+      document.getElementById('estado').innerText = texto;
+    }
+  </script>
+</body>
+</html>
