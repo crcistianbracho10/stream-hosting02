@@ -70,9 +70,8 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
 
     ffmpegArgs.push(
         '-filter_complex', filtro,
-        '-map', '[outv_final]',
-        '-map', '0:v?',              // ✅ asegura que siempre haya video
-        '-map', '0:a?',              // ✅ asegura que siempre haya audio
+        '-map', '[outv_final]',      // ✅ salida de video procesada
+        '-map', '0:a?',              // ✅ salida de audio
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
