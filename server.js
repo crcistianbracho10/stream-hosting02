@@ -68,24 +68,26 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     ffmpegArgs.push('-i', videoURL);
     if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
 
-    ffmpegArgs.push(
-        '-filter_complex', filtro,
-        '-map', '[outv_final]',
-        '-map', '0:a?',
-        '-c:v', 'libx264',
-        '-preset', 'faster',        // ✅ menos pesado que veryfast
-        '-tune', 'zerolatency',     // ✅ arranque inmediato
-        '-b:v', '1800k',            // ✅ bitrate más bajo, fluido para 8 Mbps
-        '-maxrate', '2000k',
-        '-bufsize', '4000k',        // ✅ buffer pequeño, arranca rápido
-        '-g', '60',                 // ✅ keyframe cada 2 seg a 30fps
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-ar', '44100',             // ✅ audio más liviano
-        '-ac', '2',
-        '-s', '1280x720'
-    );
+    const ffmpegArgs = [
+    '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+    '-i', videoURL,
+    '-i', 'logo.png',
+    '-filter_complex', filtro,
+    '-map', '[outv_final]',
+    '-map', '0:a?',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',   // menos carga en CPU, buena velocidad
+    '-tune', 'zerolatency',  // arranque inmediato
+    '-b:v', '2500k',         // bitrate moderado para conexiones medias
+    '-maxrate', '2500k',     // límite máximo de bitrate
+    '-bufsize', '5000k',     // buffer proporcional, no tan grande
+    '-pix_fmt', 'yuv420p',
+    '-g', '60',              // keyframe cada 2 segundos
+    '-c:a', 'aac',
+    '-b:a', '96k',           // audio más ligero
+    '-ar', '44100',          // frecuencia más baja, menos carga
+    '-s', '1280x720'         // resolución HD estándar
+];
 
     if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
     ffmpegArgs.push('-f', 'flv', RTMP_DESTINO);
