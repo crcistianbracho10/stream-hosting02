@@ -79,13 +79,15 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-maxrate', '2000k',
         '-bufsize', '6000k',
         '-pix_fmt', 'yuv420p',
-        '-g', '120',
+        '-g', '60',                  // ✅ keyframe cada 2 seg
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
         '-ac', '2',
         '-async', '1',
-        '-s', '1280x720'
+        '-s', '1280x720',
+        '-rtmp_buffer', '1000',      // ✅ menos carga inicial
+        '-rtmp_live', 'live'         // ✅ modo live real
     );
 
     if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
