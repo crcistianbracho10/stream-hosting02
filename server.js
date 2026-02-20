@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 // 📥 Playlist desde tu gist
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
 
-// 📡 RTMP destino (pegado exacto como pediste)
+// 📡 RTMP destino
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
 // 🎬 Intro y stream de Canal 11
@@ -46,16 +46,16 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     let xLogo = moverLogoDerecha ? "W-w-180" : 180;
     let yLogo = 70;
 
-    let filtro = "[0:v]scale=1920:1080,setsar=1[base];";
+    let filtro = "[0:v]scale=854:480,setsar=1[base];"; // ✅ resolución más ligera
     if (usarLogo) {
-        filtro += `[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];`;
+        filtro += `[1:v]scale=180:180:flags=lanczos,setsar=1[logo_sc];`;
         filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[tmp];`;
     } else {
         filtro += "[base]copy[tmp];";
     }
 
     if (textoCortesia) {
-        filtro += `[tmp]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
+        filtro += `[tmp]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
     } else {
         filtro += "[tmp]copy[outv];";
     }
@@ -69,23 +69,23 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
 
     ffmpegArgs.push(
-    '-filter_complex', filtro,
-    '-map', '[outv_final]',
-    '-map', '0:a?',
-    '-c:v', 'libx264',
-    '-preset', 'faster',       
-    '-tune', 'zerolatency',    
-    '-b:v', '2500k',         
-    '-maxrate', '2500k',
-    '-bufsize', '4000k',       
-    '-g', '60',              
-    '-pix_fmt', 'yuv420p',
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-ar', '44100',         
-    '-ac', '2',
-    '-s', '1280x720'
-);
+        '-filter_complex', filtro,
+        '-map', '[outv_final]',
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'superfast',       // ✅ menos carga en CPU
+        '-tune', 'zerolatency',       // ✅ arranque inmediato
+        '-b:v', '2500k',              // ✅ bitrate bajo para 5 Mbps
+        '-maxrate', '2500k',
+        '-bufsize', '5000k',          // ✅ buffer pequeño
+        '-pix_fmt', 'yuv420p',
+        '-g', '60',                   // ✅ keyframe cada 2 seg
+        '-c:a', 'aac',
+        '-b:a', '96k',                // ✅ audio más liviano
+        '-ar', '44100',
+        '-ac', '2',
+        '-s', '1080x720'               // ✅ resolución más ligera
+    );
 
     if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
     ffmpegArgs.push('-f', 'flv', RTMP_DESTINO);
@@ -107,7 +107,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
 async function iniciarMotor() {
     if (motorActivo) return;
     motorActivo = true;
-    console.log("🚀 Iniciando Transmisión Canal C Full HD...");
+    console.log("🚀 Iniciando Transmisión Canal C Optimizada...");
 
     let ultimoVideo = null;
 
@@ -158,7 +158,7 @@ async function iniciarMotor() {
 iniciarMotor();
 
 // 🌐 Endpoints Express
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 Optimizada para 5 Mbps'));
 
 // 📡 Servidor web
 app.listen(port, () => {
