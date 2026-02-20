@@ -1,4 +1,4 @@
-const { spawn, exec } = require('child_process');
+const { spawn } = require('child_process');
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -13,6 +13,9 @@ const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_3
 // 🎬 Intro y stream de Canal 11
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
+
+// ✅ Logo directo desde Wikipedia
+const LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/4/43/Canal_C_del_Zulia.png";
 
 let motorActivo = false;
 
@@ -45,7 +48,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
 
     let filtro = "[0:v]scale=1920:1080,setsar=1[base];";
     if (usarLogo) {
-        filtro += "[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];";
+        filtro += `[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];`;
         filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[tmp];`;
     } else {
         filtro += "[base]copy[tmp];";
@@ -63,7 +66,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     if (esArchivo) ffmpegArgs.push('-re'); // ✅ solo para archivos
 
     ffmpegArgs.push('-i', videoURL);
-    if (usarLogo) ffmpegArgs.push('-i', 'logo.png');
+    if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
 
     ffmpegArgs.push(
         '-filter_complex', filtro,
@@ -106,10 +109,6 @@ async function iniciarMotor() {
     if (motorActivo) return;
     motorActivo = true;
     console.log("🚀 Iniciando Transmisión Canal C Full HD...");
-
-    await new Promise(resolve => {
-        exec('curl -L -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?dl=1"', resolve);
-    });
 
     let ultimoVideo = null;
 
