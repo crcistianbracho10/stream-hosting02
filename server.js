@@ -73,17 +73,17 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-map', '[outv_final]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-tune', 'zerolatency',
-        '-b:v', '2500k',       // bitrate estable
-        '-maxrate', '2500k',   // no exceder
-        '-bufsize', '20000k',  // buffer grande para evitar cortes
-        '-g', '240',           // GOP más largo (8 seg a 30fps)
+        '-preset', 'faster',        // ✅ menos pesado que veryfast
+        '-tune', 'zerolatency',     // ✅ arranque inmediato
+        '-b:v', '1800k',            // ✅ bitrate más bajo, fluido para 8 Mbps
+        '-maxrate', '2000k',
+        '-bufsize', '4000k',        // ✅ buffer pequeño, arranca rápido
+        '-g', '60',                 // ✅ keyframe cada 2 seg a 30fps
+        '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', '128k',
-        '-ar', '48000',
+        '-ar', '44100',             // ✅ audio más liviano
         '-ac', '2',
-        '-async', '1',
         '-s', '1280x720'
     );
 
