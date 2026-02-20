@@ -50,7 +50,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true) {
     filtro += "[outv]format=yuv420p[outv_final]";
 
     const ffmpegArgs = [
-        '-re', '-i', videoURL,
+        '-i', videoURL,
         ...(usarLogo ? ['-i', 'logo.png'] : []),
         '-filter_complex', filtro,
         '-map', '[outv_final]',
@@ -60,13 +60,14 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true) {
         '-tune', 'zerolatency',
         '-b:v', '2500k',
         '-maxrate', '2500k',
-        '-bufsize', '5000k',
+        '-bufsize', '10000k',   // ✅ buffer más grande
         '-pix_fmt', 'yuv420p',
-        '-g', '60',
+        '-g', '120',            // ✅ GOP más largo
         '-c:a', 'aac',
         '-b:a', '128k',
-        '-ar', '44100',
+        '-ar', '48000',         // ✅ sample rate fijo
         '-ac', '2',
+        '-async', '1',          // ✅ corrige audio
         '-s', '1280x720'
     ];
 
@@ -101,7 +102,7 @@ async function iniciarMotor() {
 
     console.log("Descargando logo...");
     await new Promise((resolve) => {
-        exec('curl -L -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&st=d3zoo3t8&dl=1"', resolve);
+        exec('curl -L -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?dl=1"', resolve);
     });
 
     let ultimoVideo = null;
@@ -110,17 +111,23 @@ async function iniciarMotor() {
         const { activo: usarCanal11, horaVE, minutoVE } = esHorarioCanal11();
 
         if (usarCanal11) {
-            // Intro solo a las 6:00 y 13:00 exacto
             if ((horaVE === 6 && minutoVE === 0) || (horaVE === 13 && minutoVE === 0)) {
-                console.log("🎬 Lanzando intro Canal 11...");
+                console.log("🎬 Intro Canal 11...");
                 await transmitir(VIDEO_INTRO_CANAL11, 0, false);
             }
-            console.log("📺 Transmitiendo Canal 11 del Zulia (lunes a viernes, 6–8am y 1–3pm VE)");
+            console.log("📺 Transmitiendo Canal 11...");
             await transmitir(STREAM_CANAL11, 0, true);
-            continue; // ✅ Playlist pausada durante Canal 11
+
+            // ✅ Si ya pasó la hora de salida, volver a playlist
+            const ahora = new Date();
+            const horaActual = (ahora.getUTCHours() - 4 + 24) % 24;
+            if (horaActual >= 8 && horaActual < 13 || horaActual >= 15) {
+                console.log("⏹️ Fin del bloque Canal 11, regresando a playlist");
+                continue;
+            }
         }
 
-        // Si no es horario Canal 11, corre la playlist en bucle
+        // 🔄 Playlist en bucle fuera de horario Canal 11
         const playlist = await obtenerPlaylist();
 
         if (!playlist.length) {
@@ -129,12 +136,11 @@ async function iniciarMotor() {
             continue;
         }
 
-        for (let i = 0; i < playlist.length; i++) {
+        for (const item of playlist) {
             if (!motorActivo) break;
 
-            const item = playlist[i];
             let videoURL = item.url;
-            const duracion = item.duration ? item.duration : 0;
+            const duracion = item.duration || 0;
 
             if (!videoURL) {
                 console.log("⚠️ Item inválido en playlist, saltando...");
