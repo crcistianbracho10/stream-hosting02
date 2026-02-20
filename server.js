@@ -14,8 +14,8 @@ const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_3
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
 
-// ✅ Logo directo desde Wikipedia
-const LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/4/43/Canal_C_del_Zulia.png";
+// ✅ Logo local en la misma carpeta
+const LOGO_URL = "logo.png";
 
 let motorActivo = false;
 
