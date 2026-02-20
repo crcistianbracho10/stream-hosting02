@@ -75,11 +75,10 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
-        '-b:v', '2500k',
-        '-maxrate', '2500k',
-        '-bufsize', '10000k',
-        '-pix_fmt', 'yuv420p',
-        '-g', '120',
+        '-b:v', '2500k',       // bitrate estable
+        '-maxrate', '2500k',   // no exceder
+        '-bufsize', '20000k',  // buffer grande para evitar cortes
+        '-g', '240',           // GOP más largo (8 seg a 30fps)
         '-c:a', 'aac',
         '-b:a', '128k',
         '-ar', '48000',
