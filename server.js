@@ -46,7 +46,6 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         filtro += "[base]copy[tmp];";
     }
 
-    // ✅ Texto de cortesía durante Canal 11
     if (textoCortesia) {
         filtro += `[tmp]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
     } else {
@@ -118,7 +117,7 @@ async function iniciarMotor() {
                 await transmitir(VIDEO_INTRO_CANAL11, 0, false, true);
             }
             console.log("📺 Transmitiendo Canal 11...");
-            await transmitir(STREAM_CANAL11, 0, true, false, true, true); // ✅ logo derecha + texto cortesía
+            await transmitir(STREAM_CANAL11, 0, true, false, true, true);
 
             const ahora = new Date();
             const horaActual = (ahora.getUTCHours() - 4 + 24) % 24;
@@ -143,7 +142,7 @@ async function iniciarMotor() {
             if (videoURL === ultimoVideo) continue;
 
             console.log(`🎥 Transmitiendo: ${item.title}`);
-            await transmitir(videoURL, duracion, true, true, false, false); // ✅ logo normal, sin texto
+            await transmitir(videoURL, duracion, true, true, false, false);
 
             ultimoVideo = videoURL;
             console.log("➡️ Video terminado, siguiente...");
