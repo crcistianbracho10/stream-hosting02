@@ -21,15 +21,12 @@ async function obtenerPlaylist() {
     }
 }
 
-// HORARIO ESPECIAL: Canal 11 del Zulia (lunes a viernes 6–8am y 1–3pm VE)
+// HORARIO ESPECIAL: Canal 11 del Zulia (lunes a viernes 6–8am VE)
 function esHorarioCanal11() {
     const ahora = new Date();
     const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // Ajuste UTC-4
-    const dia = ahora.getUTCDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
-    return dia >= 1 && dia <= 5 && (
-        (horaVE >= 6 && horaVE < 8) ||
-        (horaVE >= 13 && horaVE < 15)
-    );
+    const dia = ahora.getUTCDay();
+    return dia >= 1 && dia <= 5 && (horaVE >= 6 && horaVE < 8);
 }
 
 // HORARIO ESPECIAL: TVES (11pm a 3:30am VE)
@@ -43,7 +40,7 @@ function esHorarioTVES() {
 // SOLO 6:00 AM exacto (Venezuela)
 function esSeisAM() {
     const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // Ajuste UTC-4
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24;
     const minutoVE = ahora.getUTCMinutes();
     return horaVE === 6 && minutoVE === 0;
 }
@@ -86,7 +83,7 @@ async function iniciarMotor() {
 
             // Caso especial Canal 11
             if (usarCanal11) {
-                console.log("📺 Horario Canal 11 del Zulia activo (6–8am y 1–3pm VE)");
+                console.log("📺 Horario Canal 11 del Zulia activo (6–8am VE)");
                 videoURL = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
             }
 
@@ -108,8 +105,8 @@ async function iniciarMotor() {
             let xLogo = 180;
             let yLogo = 70;
 
-            if (usarCanal11 || moverLogoDerecha) {
-                xLogo = "W-w-180"; // mover a la derecha
+            if (usarCanal11 || moverLogoDerecha || usarTVES) {
+                xLogo = "W-w-180"; // mover a la derecha en Canal 11, TVES y a las 6am
             }
 
             // Filtro FFmpeg
