@@ -124,9 +124,9 @@ async function iniciarMotor() {
                 '-threads', '2',
                 '-b:v', '1000k',
                 '-maxrate', '1000k',
-                '-bufsize', '15000k',   // buffer moderado
+                '-bufsize', '15000k',
                 '-pix_fmt', 'yuv420p',
-                '-g', '90',             // GOP intermedio
+                '-g', '90',
                 '-r', '30',
                 '-c:a', 'aac',
                 '-b:a', '96k',
@@ -174,7 +174,7 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
         '-threads', '2',
         '-b:v', '1000k',
         '-maxrate', '1000k',
-        '-bufsize', '15000k',
+        '-bufsize', '5000k',
         '-pix_fmt', 'yuv420p',
         '-g', '90',
         '-r', '30',
@@ -194,4 +194,22 @@ async function lanzarFFmpeg(ffmpegArgs, titulo) {
 
         ffmpeg.stderr.on("data", data => {
             const msg = data.toString();
-            console
+            console.log(`[${titulo}] FFmpeg:`, msg);
+
+            if (msg.includes("Error") || msg.includes("Invalid") || msg.includes("failed")) {
+                console.log("❌ FFmpeg no pudo abrir este video, saltando al siguiente...");
+                ffmpeg.kill("SIGKILL");
+            }
+        });
+
+        ffmpeg.on('close', () => {
+            console.log(`➡️ Transmisión terminada: ${titulo}`);
+            resolve();
+        });
+    });
+}
+
+iniciarMotor();
+
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en 720p optimizada'));
+app.listen(port);
