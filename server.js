@@ -93,13 +93,13 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-map', '[outv_final]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'superfast',   
+        '-preset', 'ultrafast',   // aún más rápido
         '-tune', 'zerolatency',
         '-b:v', '2500k',
         '-maxrate', '2500k',
-        '-bufsize', '6000k',      
+        '-bufsize', '10000k',     // buffer grande para menos cortes
         '-pix_fmt', 'yuv420p',
-        '-g', '60',
+        '-g', '120',              // GOP más largo
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
@@ -183,6 +183,3 @@ iniciarMotor();
 app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
 
 // 📡 Servidor web
-app.listen(port, () => {
-    console.log(`Servidor Express escuchando en puerto ${port}`);
-});
