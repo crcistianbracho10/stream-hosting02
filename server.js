@@ -37,14 +37,6 @@ function esSeisAM() {
     return horaVE === 6 && minutoVE === 0;
 }
 
-// HORARIO ESPECIAL: TVES de 11pm a 3:30am (Hora Venezuela)
-function esHorarioTVES() {
-    const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4
-    const minutoVE = ahora.getUTCMinutes();
-    return (horaVE >= 23 || horaVE < 3 || (horaVE === 3 && minutoVE <= 30));
-}
-
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
 async function iniciarMotor() {
@@ -78,22 +70,16 @@ async function iniciarMotor() {
             }
 
             const usarCanal11 = esHorarioCanal11();
-            const usarTVES = esHorarioTVES();
-            const moverLogoDerecha = esSeisAM() || usarTVES;
+            const moverLogoDerecha = esSeisAM();
 
             // Caso especial Canal 11
             if (usarCanal11) {
                 console.log("📺 Horario Canal 11 del Zulia activo (6am–8am VE)");
                 videoURL = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
             }
-            // Caso especial TVES
-            else if (usarTVES) {
-                console.log("📺 Bloque nocturno TVES activo (11pm–3:30am VE)");
-                videoURL = "https://vs20.live.opencaster.com/tves_5fd18b1e/index.m3u8";
-            }
 
             // Evitar repetir consecutivamente
-            if (!usarCanal11 && !usarTVES && videoURL === ultimoVideo) {
+            if (!usarCanal11 && videoURL === ultimoVideo) {
                 console.log("⏭️ Ya se transmitió este video, pasando al siguiente...");
                 continue;
             }
@@ -101,11 +87,13 @@ async function iniciarMotor() {
             console.log(`🎥 Preparando transmisión: ${item.title}`);
 
             // POSICIÓN DEL LOGO
-            let xLogo = 180; 
-            let yLogo = 70;
+            let xLogo = 180; // más aire respecto al borde izquierdo
+            let yLogo = 70;  // más aire respecto al borde superior
 
-            if (moverLogoDerecha) {
-                xLogo = "W-w-180"; // mover a la derecha
+            if (usarCanal11) {
+                xLogo = "W-w-180"; // mover al lado derecho en Canal 11
+            } else if (moverLogoDerecha) {
+                xLogo = "W-w-180"; // mover a la derecha a las 6am
             }
 
             // Filtro FFmpeg
@@ -117,37 +105,32 @@ async function iniciarMotor() {
             if (usarCanal11) {
                 filtro += ";[outv]drawtext=text='Cortesía Canal 11 del Zulia':";
                 filtro += "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:";
-                filtro += "x=W-tw-40:y=H-th-40[outv2]";
-                filtro += ";[outv2]format=yuv420p[outv_final]";
-            } else if (usarTVES) {
-                filtro += ";[outv]drawtext=text='Cortesía TVES':";
-                filtro += "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:";
-                filtro += "x=W-tw-40:y=H-th-40[outv2]";
+                filtro += "x=W-tw-40:y=H-th-40[outv2]"; // esquina inferior derecha
                 filtro += ";[outv2]format=yuv420p[outv_final]";
             } else {
                 filtro += ";[outv]format=yuv420p[outv_final]";
             }
 
             const ffmpegArgs = [
-                '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-                '-i', videoURL,
-                '-i', 'logo.png',
-                '-filter_complex', filtro,
-                '-map', '[outv_final]',
-                '-map', '0:a?',
-                '-c:v', 'libx264',
-                '-preset', 'veryfast',
-                '-tune', 'zerolatency',
-                '-b:v', '2500k',
-                '-maxrate', '2500k',
-                '-bufsize', '5000k',
-                '-pix_fmt', 'yuv420p',
-                '-g', '60',
-                '-c:a', 'aac',
-                '-b:a', '96k',
-                '-ar', '44100',
-                '-s', '1280x720',
-            ];
+    '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+    '-i', videoURL,
+    '-i', 'logo.png',
+    '-filter_complex', filtro,
+    '-map', '[outv_final]',
+    '-map', '0:a?',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',   // antes "fast" → menos CPU, más compresión
+    '-tune', 'zerolatency',
+    '-b:v', '2500k',         // antes 4000k → baja bitrate de video
+    '-maxrate', '2500k',     // límite máximo de bitrate
+    '-bufsize', '5000k',     // buffer proporcional
+    '-pix_fmt', 'yuv420p',
+    '-g', '60',
+    '-c:a', 'aac',
+    '-b:a', '96k',           // antes 128k → audio más ligero
+    '-ar', '44100',          // antes 48000 → frecuencia más baja
+    '-s', '1280x720',        // antes 1920x1080 → baja resolución a HD estándar
+];
 
             if (duracion > 0) {
                 ffmpegArgs.push("-t", String(duracion));
