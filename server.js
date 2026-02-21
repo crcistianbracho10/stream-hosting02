@@ -21,28 +21,28 @@ async function obtenerPlaylist() {
     }
 }
 
-// HORARIO ESPECIAL: Canal 11 del Zulia (lunes a viernes 6–8am VE)
+// HORARIO ESPECIAL: Lunes a Viernes, 6am a 8am (Hora Venezuela)
 function esHorarioCanal11() {
     const ahora = new Date();
     const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // Ajuste UTC-4
-    const dia = ahora.getUTCDay();
-    return dia >= 1 && dia <= 5 && (horaVE >= 6 && horaVE < 8);
-}
-
-// HORARIO ESPECIAL: TVES (11pm a 3:30am VE)
-function esHorarioTVES() {
-    const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24;
-    const minutoVE = ahora.getUTCMinutes();
-    return (horaVE >= 23) || (horaVE < 3) || (horaVE === 3 && minutoVE <= 30);
+    const dia = ahora.getUTCDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+    return dia >= 1 && dia <= 5 && horaVE >= 6 && horaVE < 8;
 }
 
 // SOLO 6:00 AM exacto (Venezuela)
 function esSeisAM() {
     const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24;
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // Ajuste UTC-4
     const minutoVE = ahora.getUTCMinutes();
     return horaVE === 6 && minutoVE === 0;
+}
+
+// HORARIO ESPECIAL: TVES de 11pm a 3:30am (Hora Venezuela)
+function esHorarioTVES() {
+    const ahora = new Date();
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4
+    const minutoVE = ahora.getUTCMinutes();
+    return (horaVE >= 23 || horaVE < 3 || (horaVE === 3 && minutoVE <= 30));
 }
 
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
@@ -79,17 +79,16 @@ async function iniciarMotor() {
 
             const usarCanal11 = esHorarioCanal11();
             const usarTVES = esHorarioTVES();
-            const moverLogoDerecha = esSeisAM();
+            const moverLogoDerecha = esSeisAM() || usarTVES;
 
             // Caso especial Canal 11
             if (usarCanal11) {
-                console.log("📺 Horario Canal 11 del Zulia activo (6–8am VE)");
+                console.log("📺 Horario Canal 11 del Zulia activo (6am–8am VE)");
                 videoURL = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
             }
-
             // Caso especial TVES
-            if (usarTVES) {
-                console.log("📺 Horario TVES activo (11pm–3:30am VE)");
+            else if (usarTVES) {
+                console.log("📺 Bloque nocturno TVES activo (11pm–3:30am VE)");
                 videoURL = "https://vs20.live.opencaster.com/tves_5fd18b1e/index.m3u8";
             }
 
@@ -102,11 +101,11 @@ async function iniciarMotor() {
             console.log(`🎥 Preparando transmisión: ${item.title}`);
 
             // POSICIÓN DEL LOGO
-            let xLogo = 180;
+            let xLogo = 180; 
             let yLogo = 70;
 
-            if (usarCanal11 || moverLogoDerecha || usarTVES) {
-                xLogo = "W-w-180"; // mover a la derecha en Canal 11, TVES y a las 6am
+            if (moverLogoDerecha) {
+                xLogo = "W-w-180"; // mover a la derecha
             }
 
             // Filtro FFmpeg
@@ -118,10 +117,14 @@ async function iniciarMotor() {
             if (usarCanal11) {
                 filtro += ";[outv]drawtext=text='Cortesía Canal 11 del Zulia':";
                 filtro += "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:";
-                filtro += "x=W-tw-40:y=H-th-40[outv2];";
-                filtro += "[outv2]format=yuv420p[outv_final]";
+                filtro += "x=W-tw-40:y=H-th-40[outv2]";
+                filtro += ";[outv2]format=yuv420p[outv_final]";
+            } else if (usarTVES) {
+                filtro += ";[outv]drawtext=text='Cortesía TVES':";
+                filtro += "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:";
+                filtro += "x=W-tw-40:y=H-th-40[outv2]";
+                filtro += ";[outv2]format=yuv420p[outv_final]";
             } else {
-                // TVES y playlist normal → solo logo
                 filtro += ";[outv]format=yuv420p[outv_final]";
             }
 
@@ -144,12 +147,13 @@ async function iniciarMotor() {
                 '-b:a', '96k',
                 '-ar', '44100',
                 '-s', '1280x720',
-                '-f', 'flv', RTMP_DESTINO
             ];
 
             if (duracion > 0) {
                 ffmpegArgs.push("-t", String(duracion));
             }
+
+            ffmpegArgs.push('-f', 'flv', RTMP_DESTINO);
 
             const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
@@ -165,7 +169,9 @@ async function iniciarMotor() {
 
             await new Promise((resolve) => ffmpeg.on('close', resolve));
 
+            // Marcar último reproducido al cerrar
             ultimoVideo = videoURL;
+
             console.log("➡️ Video terminado, pasando al siguiente...");
         }
     }
