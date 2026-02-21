@@ -6,7 +6,6 @@ const port = process.env.PORT || 3000;
 
 const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
 
-// Descargar playlist
 async function obtenerPlaylist() {
     try {
         const respuesta = await axios.get(PLAYLIST_URL, {
@@ -20,7 +19,6 @@ async function obtenerPlaylist() {
     }
 }
 
-// Horarios especiales
 function esHorarioCanal11() {
     const ahora = new Date();
     const horaVE = (ahora.getUTCHours() - 4 + 24) % 24;
@@ -85,7 +83,6 @@ async function iniciarMotor() {
             continue;
         }
 
-        // Playlist normal
         for (let i = 0; i < playlist.length; i++) {
             const item = playlist[i];
             let videoURL = item.url;
@@ -127,9 +124,9 @@ async function iniciarMotor() {
                 '-threads', '2',
                 '-b:v', '1000k',
                 '-maxrate', '1000k',
-                '-bufsize', '30000k',
+                '-bufsize', '15000k',   // buffer moderado
                 '-pix_fmt', 'yuv420p',
-                '-g', '60',
+                '-g', '90',             // GOP intermedio
                 '-r', '30',
                 '-c:a', 'aac',
                 '-b:a', '96k',
@@ -148,7 +145,6 @@ async function iniciarMotor() {
     }
 }
 
-// Transmisiones especiales
 async function transmitirEspecial(url, textoOverlay, logoDerecha) {
     console.log(`🎥 Transmisión especial activa: ${textoOverlay}`);
 
@@ -178,9 +174,9 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
         '-threads', '2',
         '-b:v', '1000k',
         '-maxrate', '1000k',
-        '-bufsize', '30000k',
+        '-bufsize', '15000k',
         '-pix_fmt', 'yuv420p',
-        '-g', '60',
+        '-g', '90',
         '-r', '30',
         '-c:a', 'aac',
         '-b:a', '96k',
@@ -192,29 +188,10 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
     await lanzarFFmpeg(ffmpegArgs, textoOverlay);
 }
 
-// Lanzar FFmpeg
 async function lanzarFFmpeg(ffmpegArgs, titulo) {
     return new Promise((resolve) => {
         const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
         ffmpeg.stderr.on("data", data => {
             const msg = data.toString();
-            console.log(`[${titulo}] FFmpeg:`, msg);
-
-            if (msg.includes("Error") || msg.includes("Invalid") || msg.includes("failed")) {
-                console.log("❌ FFmpeg no pudo abrir este video, saltando al siguiente...");
-                ffmpeg.kill("SIGKILL");
-            }
-        });
-
-        ffmpeg.on('close', () => {
-            console.log(`➡️ Transmisión terminada: ${titulo}`);
-            resolve();
-        });
-    });
-}
-
-iniciarMotor();
-
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en 720p optimizada'));
-app.listen(port);
+            console
