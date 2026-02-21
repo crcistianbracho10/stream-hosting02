@@ -14,7 +14,7 @@ const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_3
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
 
-// ✅ Logo local en la misma carpeta
+// ✅ Logo local
 const LOGO_URL = "logo.png";
 
 let motorActivo = false;
@@ -46,52 +46,43 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     let xLogo = moverLogoDerecha ? "W-w-180" : 180;
     let yLogo = 70;
 
-    let filtro = "[0:v]scale=1920:1080,setsar=1[base];";
-    if (usarLogo) {
-        filtro += `[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];`;
-        filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[tmp];`;
-    } else {
-        filtro += "[base]copy[tmp];";
-    }
-
+    // Filtro compacto estilo antiguo
+    let filtro = `[0:v]scale=1280:720,setsar=1[base];[1:v]scale=260:260:flags=lanczos[logo];[base][logo]overlay=${xLogo}:${yLogo}[outv]`;
     if (textoCortesia) {
-        filtro += `[tmp]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
+        filtro += `;[outv]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv2];[outv2]format=yuv420p[outv_final]`;
     } else {
-        filtro += "[tmp]copy[outv];";
+        filtro += `;[outv]format=yuv420p[outv_final]`;
     }
-
-    filtro += "[outv]format=yuv420p[outv_final]";
 
     const ffmpegArgs = [];
-    if (esArchivo) ffmpegArgs.push('-re'); // ✅ solo para archivos locales
-
-    ffmpegArgs.push('-i', videoURL);
-    if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
+    if (esArchivo) ffmpegArgs.push('-re'); // lectura en tiempo real para archivos
 
     ffmpegArgs.push(
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-i', videoURL,
+        '-i', LOGO_URL,
         '-filter_complex', filtro,
-        '-map', '[outv_final]',      // salida de video procesada
-        '-map', '0:a?',              // salida de audio
+        '-map', '[outv_final]',
+        '-map', '0:a?',
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
-        '-b:v', '2000k',
-        '-maxrate', '2000k',
-        '-bufsize', '2000k',         // ✅ bufsize reducido
+        '-b:v', '2500k',
+        '-maxrate', '2500k',
+        '-bufsize', '5000k',
         '-pix_fmt', 'yuv420p',
-        '-g', '30',                  // ✅ keyframe cada 1 seg
+        '-g', '60',
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
         '-ac', '2',
-        '-async', '1',
         '-s', '1280x720',
-        '-rtmp_buffer', '500',       // ✅ buffer RTMP más corto
-        '-rtmp_live', 'live'
+        '-f', 'flv', RTMP_DESTINO
     );
 
     if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
-    ffmpegArgs.push('-f', 'flv', RTMP_DESTINO);
 
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
@@ -105,7 +96,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     });
 
     await new Promise(resolve => ffmpeg.on('close', resolve));
-    await new Promise(r => setTimeout(r, 3000)); // espera antes de relanzar
+    await new Promise(r => setTimeout(r, 2000)); // espera corta antes de relanzar
 }
 
 async function iniciarMotor() {
@@ -125,13 +116,7 @@ async function iniciarMotor() {
             }
             console.log("📺 Transmitiendo Canal 11...");
             await transmitir(STREAM_CANAL11, 0, true, false, true, true);
-
-            const ahora = new Date();
-            const horaActual = (ahora.getUTCHours() - 4 + 24) % 24;
-            if ((horaActual >= 8 && horaActual < 13) || horaActual >= 15) {
-                console.log("⏹️ Fin del bloque Canal 11, regresando a playlist");
-                continue;
-            }
+            continue;
         }
 
         const playlist = await obtenerPlaylist();
@@ -149,7 +134,7 @@ async function iniciarMotor() {
             if (videoURL === ultimoVideo) continue;
 
             console.log(`🎥 Transmitiendo: ${item.title}`);
-            await transmitir(videoURL, duracion, true, false, false, false);
+            await transmitir(videoURL, duracion, true, true, false, false);
 
             ultimoVideo = videoURL;
             console.log("➡️ Video terminado, siguiente...");
