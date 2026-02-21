@@ -65,10 +65,10 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         xLogo = "W-w-180"; // mover a la derecha en horarios especiales
     }
 
-    // Filtro FFmpeg con logo más pequeño
+    // Filtro FFmpeg con logo más grande
     let filtro = "";
     filtro += "[0:v]scale=1920:1080,setsar=1[base];";
-    filtro += "[1:v]scale=160:160:flags=lanczos,setsar=1[logo_sc];"; // logo más pequeño
+    filtro += "[1:v]scale=220:220:flags=lanczos,setsar=1[logo_sc];"; // logo un poco más grande
     filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[outv]`;
 
     if (textoExtra) {
@@ -179,4 +179,4 @@ async function iniciarMotor() {
 // 🚀 Arranca el motor automáticamente
 iniciarMotor();
 
-//
+// 🌐 Endpoints
