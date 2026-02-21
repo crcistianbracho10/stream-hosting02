@@ -14,7 +14,10 @@ const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_3
 const VIDEO_INTRO_CANAL11 = "https://archive.org/download/graficos-canal-11-del-zulia-2022-vigente-la-tele-vzla-720p-h-264-online-video-cutter.com-1/Graficos%20canal%2011%20del%20zulia%202022%20vigente%20-%20LA%20Tele%20vzla%20%28720p%2C%20h264%29%20%28online-video-cutter.com%29%20%281%29.mp4";
 const STREAM_CANAL11 = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
 
-// ✅ Logo local
+// 📺 Stream de TVES
+const STREAM_TVES = "https://vs20.live.opencaster.com/tves_5fd18b1e/index.m3u8";
+
+// ✅ Logo local en la misma carpeta
 const LOGO_URL = "logo.png";
 
 let motorActivo = false;
@@ -42,27 +45,48 @@ function esHorarioCanal11() {
     return { activo: esDiaSemana && (enHorarioManana || enHorarioTarde), horaVE, minutoVE };
 }
 
-async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = false, moverLogoDerecha = false, textoCortesia = false) {
+// 🕒 Horario especial TVES: todos los días, 11pm–3:30am VE
+function esHorarioTVES() {
+    const ahora = new Date();
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4 Caracas
+    const minutoVE = ahora.getUTCMinutes();
+    const enHorarioNoche = (horaVE >= 23 || horaVE < 3 || (horaVE === 3 && minutoVE <= 30));
+    return { activo: enHorarioNoche, horaVE, minutoVE };
+}
+
+async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = false, moverLogoDerecha = false, textoCortesia = false, textoExtra = "") {
     let xLogo = moverLogoDerecha ? "W-w-180" : 180;
     let yLogo = 70;
 
-    // Filtro compacto estilo antiguo
-    let filtro = `[0:v]scale=1280:720,setsar=1[base];[1:v]scale=260:260:flags=lanczos[logo];[base][logo]overlay=${xLogo}:${yLogo}[outv]`;
-    if (textoCortesia) {
-        filtro += `;[outv]drawtext=text='Cortesía Canal 11 del Zulia':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv2];[outv2]format=yuv420p[outv_final]`;
+    let filtro = "[0:v]scale=1280:720,setsar=1[base];";
+    if (usarLogo) {
+        filtro += `[1:v]scale=260:260:flags=lanczos[logo];`;
+        filtro += `[base][logo]overlay=${xLogo}:${yLogo}[tmp];`;
     } else {
-        filtro += `;[outv]format=yuv420p[outv_final]`;
+        filtro += "[base]copy[tmp];";
     }
 
+    if (textoCortesia || textoExtra) {
+        let texto = textoExtra || "Cortesía Canal 11 del Zulia";
+        filtro += `[tmp]drawtext=text='${texto}':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
+    } else {
+        filtro += "[tmp]copy[outv];";
+    }
+
+    filtro += "[outv]format=yuv420p[outv_final]";
+
     const ffmpegArgs = [];
-    if (esArchivo) ffmpegArgs.push('-re'); // lectura en tiempo real para archivos
+    if (esArchivo) ffmpegArgs.push('-re');
 
     ffmpegArgs.push(
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
-        '-i', videoURL,
-        '-i', LOGO_URL,
+        '-i', videoURL
+    );
+    if (usarLogo) ffmpegArgs.push('-i', LOGO_URL);
+
+    ffmpegArgs.push(
         '-filter_complex', filtro,
         '-map', '[outv_final]',
         '-map', '0:a?',
@@ -96,7 +120,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     });
 
     await new Promise(resolve => ffmpeg.on('close', resolve));
-    await new Promise(r => setTimeout(r, 2000)); // espera corta antes de relanzar
+    await new Promise(r => setTimeout(r, 2000));
 }
 
 async function iniciarMotor() {
@@ -108,6 +132,7 @@ async function iniciarMotor() {
 
     while (motorActivo) {
         const { activo: usarCanal11, horaVE, minutoVE } = esHorarioCanal11();
+        const { activo: usarTVES } = esHorarioTVES();
 
         if (usarCanal11) {
             if ((horaVE === 6 && minutoVE === 0) || (horaVE === 13 && minutoVE === 0)) {
@@ -116,6 +141,12 @@ async function iniciarMotor() {
             }
             console.log("📺 Transmitiendo Canal 11...");
             await transmitir(STREAM_CANAL11, 0, true, false, true, true);
+            continue;
+        }
+
+        if (usarTVES) {
+            console.log("📺 Transmitiendo TVES (11pm–3:30am VE)...");
+            await transmitir(STREAM_TVES, 0, true, false, true, true, "Cortesía TVES");
             continue;
         }
 
