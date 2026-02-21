@@ -48,7 +48,7 @@ function esSeisAM() {
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
 
 async function iniciarMotor() {
-    console.log("🚀 Iniciando Transmisión Canal C Full HD...");
+    console.log("🚀 Iniciando Transmisión Canal C Optimizada...");
     let ultimoVideo = null;
 
     while (true) {
@@ -106,7 +106,7 @@ async function iniciarMotor() {
             let xLogo = moverLogoDerecha ? "W-w-180" : 180;
             let yLogo = 70;
 
-            let filtro = "[0:v]scale=1920:1080,setsar=1[base];";
+            let filtro = "[0:v]scale=1280:720,setsar=1[base];";
             filtro += "[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];";
             filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[outv];`;
             filtro += "[outv]format=yuv420p[outv_final]";
@@ -124,11 +124,13 @@ async function iniciarMotor() {
                 '-c:v', 'libx264',
                 '-preset', 'veryfast',
                 '-tune', 'zerolatency',
-                '-b:v', '1500k',        // bitrate promedio más bajo
-                '-maxrate', '1500k',    // techo máximo más bajo
-                '-bufsize', '30000k',   // buffer grande para estabilidad
+                '-threads', '2',
+                '-b:v', '1000k',
+                '-maxrate', '1000k',
+                '-bufsize', '30000k',
                 '-pix_fmt', 'yuv420p',
-                '-g', '60',             // GOP más corto → refresca más rápido
+                '-g', '60',
+                '-r', '30',
                 '-c:a', 'aac',
                 '-b:a', '96k',
                 '-ar', '44100',
@@ -153,7 +155,7 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
     let xLogo = logoDerecha ? "W-w-180" : 180;
     let yLogo = 70;
 
-    let filtro = "[0:v]scale=1920:1080,setsar=1[base];";
+    let filtro = "[0:v]scale=1280:720,setsar=1[base];";
     filtro += "[1:v]scale=260:260:flags=lanczos,setsar=1[logo_sc];";
     filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[outv];`;
     filtro += `[outv]drawtext=text='${textoOverlay}':`;
@@ -173,11 +175,13 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
-        '-b:v', '1300k',
-        '-maxrate', '1300k',
+        '-threads', '2',
+        '-b:v', '1000k',
+        '-maxrate', '1000k',
         '-bufsize', '30000k',
         '-pix_fmt', 'yuv420p',
         '-g', '60',
+        '-r', '30',
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
@@ -212,5 +216,5 @@ async function lanzarFFmpeg(ffmpegArgs, titulo) {
 
 iniciarMotor();
 
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en 720p estable'));
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en 720p optimizada'));
 app.listen(port);
