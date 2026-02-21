@@ -123,9 +123,9 @@ async function iniciarMotor() {
                 '-tune', 'zerolatency',
                 '-b:v', '2500k',
                 '-maxrate', '2500k',
-                '-bufsize', '7500k',
+                '-bufsize', '30000k',   // buffer aumentado
                 '-pix_fmt', 'yuv420p',
-                '-g', '90',
+                '-g', '120',            // GOP más largo
                 '-c:a', 'aac',
                 '-b:a', '96k',
                 '-ar', '44100',
@@ -169,9 +169,9 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
         '-tune', 'zerolatency',
         '-b:v', '2500k',
         '-maxrate', '2500k',
-        '-bufsize', '7500k',
+        '-bufsize', '30000k',   // buffer aumentado
         '-pix_fmt', 'yuv420p',
-        '-g', '90',
+        '-g', '120',
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
