@@ -36,7 +36,7 @@ async function obtenerPlaylist() {
 // 🕒 Horario especial Canal 11: lunes a viernes, 6–8am y 1–3pm VE
 function esHorarioCanal11() {
     const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4 Caracas
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; 
     const minutoVE = ahora.getUTCMinutes();
     const dia = ahora.getUTCDay();
     const esDiaSemana = dia >= 1 && dia <= 5;
@@ -48,7 +48,7 @@ function esHorarioCanal11() {
 // 🕒 Horario especial TVES: todos los días, 11pm–3:30am VE
 function esHorarioTVES() {
     const ahora = new Date();
-    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; // UTC-4 Caracas
+    const horaVE = (ahora.getUTCHours() - 4 + 24) % 24; 
     const minutoVE = ahora.getUTCMinutes();
     const enHorarioNoche = (horaVE >= 23 || horaVE < 3 || (horaVE === 3 && minutoVE <= 30));
     return { activo: enHorarioNoche, horaVE, minutoVE };
@@ -56,19 +56,19 @@ function esHorarioTVES() {
 
 async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = false, usarCanal = false, moverLogoDerecha = false, textoExtra = "") {
     // POSICIÓN DEL LOGO
-    let xLogo = 180; // más aire respecto al borde izquierdo
-    let yLogo = 70;  // más aire respecto al borde superior
+    let xLogo = 180; 
+    let yLogo = 70;  
 
     if (usarCanal) {
-        xLogo = "W-w-180"; // mover al lado derecho en Canal especial
+        xLogo = "W-w-180"; 
     } else if (moverLogoDerecha) {
-        xLogo = "W-w-180"; // mover a la derecha en horarios especiales
+        xLogo = "W-w-180"; 
     }
 
-    // Filtro FFmpeg con logo más grande
+    // Filtro FFmpeg con logo un poco más grande
     let filtro = "";
     filtro += "[0:v]scale=1920:1080,setsar=1[base];";
-    filtro += "[1:v]scale=220:220:flags=lanczos,setsar=1[logo_sc];"; // logo un poco más grande
+    filtro += "[1:v]scale=200:200:flags=lanczos,setsar=1[logo_sc];"; 
     filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[outv]`;
 
     if (textoExtra) {
@@ -78,7 +78,7 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
     }
 
     const ffmpegArgs = [];
-    if (esArchivo) ffmpegArgs.push('-re'); // lectura en tiempo real para archivos
+    if (esArchivo) ffmpegArgs.push('-re'); 
 
     ffmpegArgs.push(
         '-reconnect', '1',
@@ -93,11 +93,11 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-map', '[outv_final]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'superfast',   // más rápido que veryfast
+        '-preset', 'superfast',   
         '-tune', 'zerolatency',
         '-b:v', '2500k',
         '-maxrate', '2500k',
-        '-bufsize', '5000k',      // buffer más grande
+        '-bufsize', '6000k',      
         '-pix_fmt', 'yuv420p',
         '-g', '60',
         '-c:a', 'aac',
@@ -179,4 +179,10 @@ async function iniciarMotor() {
 // 🚀 Arranca el motor automáticamente
 iniciarMotor();
 
-// 🌐 Endpoints
+// 🌐 Endpoints Express
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
+
+// 📡 Servidor web
+app.listen(port, () => {
+    console.log(`Servidor Express escuchando en puerto ${port}`);
+});
