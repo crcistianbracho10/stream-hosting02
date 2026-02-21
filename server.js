@@ -113,6 +113,9 @@ async function iniciarMotor() {
 
             const ffmpegArgs = [
                 '-re',
+                '-reconnect', '1',
+                '-reconnect_streamed', '1',
+                '-reconnect_delay_max', '2',
                 '-i', videoURL,
                 '-i', 'logo.png',
                 '-filter_complex', filtro,
@@ -121,11 +124,11 @@ async function iniciarMotor() {
                 '-c:v', 'libx264',
                 '-preset', 'veryfast',
                 '-tune', 'zerolatency',
-                '-b:v', '2500k',
-                '-maxrate', '2500k',
-                '-bufsize', '30000k',   // buffer aumentado
+                '-b:v', '1500k',        // bitrate promedio más bajo
+                '-maxrate', '1500k',    // techo máximo más bajo
+                '-bufsize', '30000k',   // buffer grande para estabilidad
                 '-pix_fmt', 'yuv420p',
-                '-g', '120',            // GOP más largo
+                '-g', '60',             // GOP más corto → refresca más rápido
                 '-c:a', 'aac',
                 '-b:a', '96k',
                 '-ar', '44100',
@@ -159,6 +162,9 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
     filtro += "[outv2]format=yuv420p[outv_final]";
 
     const ffmpegArgs = [
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '2',
         '-i', url,
         '-i', 'logo.png',
         '-filter_complex', filtro,
@@ -167,11 +173,11 @@ async function transmitirEspecial(url, textoOverlay, logoDerecha) {
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-tune', 'zerolatency',
-        '-b:v', '2500k',
-        '-maxrate', '2500k',
-        '-bufsize', '30000k',   // buffer aumentado
+        '-b:v', '1300k',
+        '-maxrate', '1300k',
+        '-bufsize', '30000k',
         '-pix_fmt', 'yuv420p',
-        '-g', '120',
+        '-g', '60',
         '-c:a', 'aac',
         '-b:a', '96k',
         '-ar', '44100',
@@ -206,5 +212,5 @@ async function lanzarFFmpeg(ffmpegArgs, titulo) {
 
 iniciarMotor();
 
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
+app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en 720p estable'));
 app.listen(port);
