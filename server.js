@@ -54,29 +54,31 @@ function esHorarioTVES() {
     return { activo: enHorarioNoche, horaVE, minutoVE };
 }
 
-async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = false, moverLogoDerecha = false, textoCortesia = false, textoExtra = "") {
-    let xLogo = moverLogoDerecha ? "W-w-180" : 180;
-    let yLogo = 70;
+async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = false, usarCanal = false, moverLogoDerecha = false, textoExtra = "") {
+    // POSICIÓN DEL LOGO
+    let xLogo = 180; // más aire respecto al borde izquierdo
+    let yLogo = 70;  // más aire respecto al borde superior
 
-    let filtro = "[0:v]scale=1280:720,setsar=1[base];";
-    if (usarLogo) {
-        filtro += `[1:v]scale=260:260:flags=lanczos[logo];`;
-        filtro += `[base][logo]overlay=${xLogo}:${yLogo}[tmp];`;
-    } else {
-        filtro += "[base]copy[tmp];";
+    if (usarCanal) {
+        xLogo = "W-w-180"; // mover al lado derecho en Canal especial
+    } else if (moverLogoDerecha) {
+        xLogo = "W-w-180"; // mover a la derecha en horarios especiales
     }
 
-    if (textoCortesia || textoExtra) {
-        let texto = textoExtra || "Cortesía Canal 11 del Zulia";
-        filtro += `[tmp]drawtext=text='${texto}':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv];`;
-    } else {
-        filtro += "[tmp]copy[outv];";
-    }
+    // Filtro FFmpeg con logo más pequeño
+    let filtro = "";
+    filtro += "[0:v]scale=1920:1080,setsar=1[base];";
+    filtro += "[1:v]scale=160:160:flags=lanczos,setsar=1[logo_sc];"; // logo más pequeño
+    filtro += `[base][logo_sc]overlay=${xLogo}:${yLogo}[outv]`;
 
-    filtro += "[outv]format=yuv420p[outv_final]";
+    if (textoExtra) {
+        filtro += `;[outv]drawtext=text='${textoExtra}':x=W-tw-20:y=H-th-20:fontsize=32:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2[outv2];[outv2]format=yuv420p[outv_final]`;
+    } else {
+        filtro += ";[outv]format=yuv420p[outv_final]";
+    }
 
     const ffmpegArgs = [];
-    if (esArchivo) ffmpegArgs.push('-re');
+    if (esArchivo) ffmpegArgs.push('-re'); // lectura en tiempo real para archivos
 
     ffmpegArgs.push(
         '-reconnect', '1',
@@ -91,11 +93,11 @@ async function transmitir(videoURL, duracion = 0, usarLogo = true, esArchivo = f
         '-map', '[outv_final]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
+        '-preset', 'superfast',   // más rápido que veryfast
         '-tune', 'zerolatency',
         '-b:v', '2500k',
         '-maxrate', '2500k',
-        '-bufsize', '5000k',
+        '-bufsize', '5000k',      // buffer más grande
         '-pix_fmt', 'yuv420p',
         '-g', '60',
         '-c:a', 'aac',
@@ -140,7 +142,7 @@ async function iniciarMotor() {
                 await transmitir(VIDEO_INTRO_CANAL11, 0, false, true);
             }
             console.log("📺 Transmitiendo Canal 11...");
-            await transmitir(STREAM_CANAL11, 0, true, false, true, true);
+            await transmitir(STREAM_CANAL11, 0, true, false, true, true, "Cortesía Canal 11 del Zulia");
             continue;
         }
 
@@ -177,10 +179,4 @@ async function iniciarMotor() {
 // 🚀 Arranca el motor automáticamente
 iniciarMotor();
 
-// 🌐 Endpoints Express
-app.get('/', (req, res) => res.send('Transmisión Canal C Activa 24/7 en Full HD'));
-
-// 📡 Servidor web
-app.listen(port, () => {
-    console.log(`Servidor Express escuchando en puerto ${port}`);
-});
+//
