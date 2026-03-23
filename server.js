@@ -99,10 +99,10 @@ async function motorCanalC() {
 
         // --- MEDIDAS ACTUALIZADAS ---
         // Tamaño: 160px | Horizontal: 140px | Vertical: 70px
-        let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-140" : "160";
+        let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-140" : "140";
         let yPos = "70";
 
-        console.log(`\n📺 TRANSMITIENDO: ${video.title} [LOGO GIF 160px]`);
+        console.log(`\n📺 TRANSMITIENDO: ${video.title} [LOGO GIF 140px]`);
 
         const args = [
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
@@ -111,7 +111,7 @@ async function motorCanalC() {
             '-ignore_loop', '0', '-i', 'canal-C.gif', // -ignore_loop 0 hace que el GIF se repita siempre
             '-filter_complex', 
             `[0:v]fps=24,scale=1280:720,setsar=1[bg];` +
-            `[1:v]scale=160:-1[logo];` + // Tamaño 160px
+            `[1:v]scale=140:-1[logo];` + // Tamaño 160px
             `[bg][logo]overlay=${xPos}:${yPos}:shortest=1,format=yuv420p[v]`,
             '-map', '[v]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
