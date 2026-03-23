@@ -11,7 +11,7 @@ const M3U8_URL = "https://vs20.live.opencaster.com/cristianhilos_314b91b0/index.
 let playlist = [];
 let indiceActual = 0;
 
-// --- REPRODUCTOR HLS CON BUFFER ACELERADO ---
+// --- REPRODUCTOR WEB (HLS.js) ---
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
         <style>
             body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
             video { width: 100vw; height: 100vh; object-fit: contain; }
-            .controls { position: absolute; top: 15px; right: 15px; z-index: 10; opacity: 0.4; }
+            .controls { position: absolute; top: 15px; right: 15px; z-index: 10; opacity: 0.5; }
             select { background: #111; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px; }
         </style>
     </head>
@@ -32,15 +32,7 @@ app.get('/', (req, res) => {
         <script>
             const v = document.getElementById('video');
             if (Hls.isSupported()) {
-                const hls = new Hls({
-                    // CONFIGURACIÓN DE BUFFER RÁPIDO
-                    maxBufferLength: 30,      // Buffer de 30 segundos
-                    maxMaxBufferLength: 60,
-                    enableWorker: true,
-                    lowLatencyMode: false,    // Desactivado para permitir más buffer preventivo
-                    liveSyncDuration: 10,     // Mantener 10 segundos de seguridad
-                    manifestLoadingMaxRetry: 10
-                });
+                const hls = new Hls({ maxBufferLength: 30, liveSyncDuration: 10 });
                 hls.loadSource("${M3U8_URL}");
                 hls.attachMedia(v);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -49,9 +41,7 @@ app.get('/', (req, res) => {
                         o.value = i; o.text = l.height + 'p';
                         document.getElementById('qSel').appendChild(o);
                     });
-                    v.play();
                 });
-                document.getElementById('qSel').onchange = () => hls.currentLevel = parseInt(document.getElementById('qSel').value);
             }
         </script>
     </body>
@@ -62,7 +52,7 @@ app.get('/', (req, res) => {
 // --- MOTOR DE TRANSMISIÓN ---
 
 async function prepararAssets() {
-    await new Promise(resolve => exec('curl -L -s -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&dl=1"', resolve));
+    await new Promise(resolve => exec('curl -L -s -o logo.gif "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&dl=1"', resolve));
 }
 
 function obtenerVivo() {
@@ -93,7 +83,7 @@ async function motorCanalC() {
         try {
             const res = await axios.get(`${GIST_URL}?nocache=${Date.now()}`);
             playlist = Array.isArray(res.data) ? res.data : JSON.parse(res.data);
-        } catch (e) { console.log("Reintentando carga..."); }
+        } catch (e) { console.log("Cargando playlist..."); }
 
         let vivo = obtenerVivo();
         let video = vivo || (playlist.length > 0 ? playlist[indiceActual] : null);
@@ -104,25 +94,26 @@ async function motorCanalC() {
             ? video.url.replace(/www\.dropbox\.com/, "dl.dropboxusercontent.com").replace(/\?dl=[01]/, "") 
             : video.url;
 
-        // --- TUS MEDIDAS EXACTAS ---
-        // Tamaño: 150px | Horizontal: 140px | Vertical: 70px
+        // Medidas: Tamaño 160px | Horizontal 140px | Vertical 70px
         let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-140" : "140";
         let yPos = "70";
 
-        console.log(`\n📺 TRANSMITIENDO: ${video.title}`);
+        console.log(`\n📺 TRANSMITIENDO: ${video.title} [Chroma Key Activo]`);
 
         const args = [
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
-            '-probesize', '5M', '-analyzeduration', '5M', // Analiza rápido para empezar el buffer
+            '-probesize', '10M', '-analyzeduration', '10M',
             '-i', urlFinal, 
-            '-i', 'logo.png',
+            '-ignore_loop', '0', '-i', 'logo.gif',
             '-filter_complex', 
             `[0:v]fps=24,scale=1280:720,setsar=1[bg];` +
-            `[1:v]scale=150:-1[logo];` + // Tamaño 150px
-            `[bg][logo]overlay=${xPos}:${yPos},format=yuv420p[v]`,
+            // FILTRO CHROMA KEY: El 0x00FF00 es el verde puro. 
+            // similarity=0.1 y blend=0.2 ajustan qué tan fuerte quita el verde.
+            `[1:v]scale=160:-1,colorkey=0x00FF00:0.1:0.2[logo_transp];` + 
+            `[bg][logo_transp]overlay=${xPos}:${yPos}:shortest=1,format=yuv420p[v]`,
             '-map', '[v]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
-            '-b:v', '1800k', '-maxrate', '2000k', '-bufsize', '4000k', // Buffer más grande para estabilidad
+            '-b:v', '1800k', '-maxrate', '2000k', '-bufsize', '4000k', 
             '-g', '48', '-c:a', 'aac', '-b:a', '128k',
             '-f', 'flv', RTMP_DESTINO
         ];
@@ -130,10 +121,6 @@ async function motorCanalC() {
         const ffmpeg = spawn('ffmpeg', args);
 
         await new Promise((resolve) => {
-            ffmpeg.stderr.on('data', (data) => {
-                if (data.toString().includes("403 Forbidden")) ffmpeg.kill('SIGKILL');
-            });
-
             ffmpeg.on("close", () => {
                 if (!vivo) indiceActual = (indiceActual + 1) % playlist.length;
                 resolve();
