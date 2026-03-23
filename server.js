@@ -4,7 +4,7 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 
-const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/3d2e8c83d060ac1c7dc890c1ed56c35c/raw/playlist.json";
+const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/6e4a07d268460ea807abf28f77c3880e/raw";
 const RTMP_DESTINO = "rtmp://live.restream.io/live/re_8275433_event74378d151bdc489d857a4212c6a591cd";
 
 // Función para logs con hora
