@@ -100,7 +100,7 @@ async function motorCanalC() {
         // --- MEDIDAS ACTUALIZADAS ---
         // Tamaño: 160px | Horizontal: 140px | Vertical: 70px
         let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-140" : "140";
-        let yPos = "60";
+        let yPos = "70";
 
         console.log(`\n📺 TRANSMITIENDO: ${video.title} [LOGO GIF 140px]`);
 
