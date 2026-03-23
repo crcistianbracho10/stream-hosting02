@@ -11,7 +11,7 @@ const M3U8_URL = "https://vs20.live.opencaster.com/cristianhilos_314b91b0/index.
 let playlist = [];
 let indiceActual = 0;
 
-// --- REPRODUCTOR HLS PROFESIONAL ---
+// --- REPRODUCTOR WEB HLS ---
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -21,9 +21,9 @@ app.get('/', (req, res) => {
         <style>
             body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
             video { width: 100vw; height: 100vh; object-fit: contain; }
-            .controls { position: absolute; top: 20px; right: 20px; z-index: 10; opacity: 0.4; transition: 0.3s; }
+            .controls { position: absolute; top: 20px; right: 20px; z-index: 10; opacity: 0.5; transition: 0.3s; }
             .controls:hover { opacity: 1; }
-            select { background: #222; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; cursor: pointer; }
+            select { background: #111; color: #fff; border: 1px solid #555; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         </style>
     </head>
     <body>
@@ -67,7 +67,8 @@ function obtenerVivo() {
     const d = fechaVE.getDay();
     const esAntesDelCierre = (m < 58);
 
-    // DERECHA: Canal 11 y TVES | IZQUIERDA: TeleSUR
+    // Lógica invertida según tu imagen:
+    // DERECHA: Canal 11 / TVES | IZQUIERDA: TeleSUR / Playlist
     if (d >= 1 && d <= 5 && (h === 6 || h === 13) && esAntesDelCierre) {
         return { url: "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8", title: "Canal 11 Zulia", posicion: "derecha" };
     }
@@ -87,13 +88,12 @@ async function motorCanalC() {
         try {
             const res = await axios.get(`${GIST_URL}?nocache=${Date.now()}`);
             playlist = Array.isArray(res.data) ? res.data : JSON.parse(res.data);
-        } catch (e) { console.log("Error Gist, usando playlist local"); }
+        } catch (e) { console.log("Reintentando carga de Playlist..."); }
 
         let vivo = obtenerVivo();
         let video = vivo || (playlist.length > 0 ? playlist[indiceActual] : null);
         
         if (!video) {
-            console.log("Esperando contenido...");
             await new Promise(r => setTimeout(r, 5000));
             continue;
         }
@@ -102,12 +102,12 @@ async function motorCanalC() {
             ? video.url.replace(/www\.dropbox\.com/, "dl.dropboxusercontent.com").replace(/\?dl=[01]/, "") 
             : video.url;
 
-        // --- AJUSTES DE LOGO SOLICITADOS ---
-        // Tamaño: 250px | Vertical: 80px | Horizontal: 240px
-        let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-240" : "240";
+        // --- TUS NUEVAS MEDIDAS ---
+        // Tamaño: 180px | Horizontal: 150px | Vertical: 80px
+        let xPos = (video.posicion === "derecha") ? "main_w-overlay_w-150" : "150";
         let yPos = "80";
 
-        console.log(`\n🚀 TRANSMITIENDO: ${video.title}`);
+        console.log(`\n📺 [${new Date().toLocaleTimeString()}] TRANSMITIENDO: ${video.title}`);
 
         const args = [
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '4',
@@ -116,49 +116,50 @@ async function motorCanalC() {
             '-i', 'logo.png',
             '-filter_complex', 
             `[0:v]fps=24,scale=1280:720,setsar=1[bg];` +
-            `[1:v]scale=250:-1[logo];` + // Tamaño del logo a 250px
+            `[1:v]scale=180:-1[logo];` + // Logo ajustado a 180px
             `[bg][logo]overlay=${xPos}:${yPos},format=yuv420p[v]`,
-            '-map', '[v]', '-map', '0:a?', // El '?' evita que FFmpeg falle si un video no tiene audio
+            '-map', '[v]', '-map', '0:a?',
             '-c:v', 'libx264', '-preset', 'ultrafast', '-b:v', '1500k', 
             '-maxrate', '1500k', '-bufsize', '3000k',
-            '-g', '48', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+            '-g', '48', '-c:a', 'aac', '-b:a', '128k',
             '-f', 'flv', RTMP_DESTINO
         ];
 
         const ffmpeg = spawn('ffmpeg', args);
-        let detectadoError = false;
-
-        ffmpeg.stderr.on('data', (data) => {
-            const msg = data.toString();
-            // Si la señal m3u8 da error 403, 404 o timeout, marcamos para reiniciar
-            if (msg.includes("Server returned 403") || msg.includes("Connection timed out") || msg.includes("Immediate exit requested")) {
-                detectadoError = true;
-                ffmpeg.kill('SIGKILL');
-            }
-        });
 
         await new Promise((resolve) => {
+            let detectadoError = false;
+
+            ffmpeg.stderr.on('data', (data) => {
+                const msg = data.toString();
+                // Si la señal falla, forzamos cierre para saltar al siguiente
+                if (msg.includes("403 Forbidden") || msg.includes("Connection timed out")) {
+                    detectadoError = true;
+                    ffmpeg.kill('SIGKILL');
+                }
+            });
+
             ffmpeg.on("close", () => {
-                // Si la señal se cayó o terminó y no es un "vivo" programado, pasamos al siguiente de la playlist
+                // Si hubo error o terminó el video, avanzamos en la playlist
                 if (!vivo || detectadoError) {
                     indiceActual = (indiceActual + 1) % playlist.length;
                 }
                 resolve();
             });
             
-            // Watchdog: Si el vivo cambia o termina el horario, matamos proceso para actualizar
-            const checkInterval = setInterval(() => {
-                const ahoraVivo = obtenerVivo();
-                if (vivo && !ahoraVivo) ffmpeg.kill('SIGKILL');
-                if (!vivo && ahoraVivo) ffmpeg.kill('SIGKILL');
+            // Monitor de cambio de horario (Vivo <-> Playlist)
+            const monitor = setInterval(() => {
+                const checkVivo = obtenerVivo();
+                if ((vivo && !checkVivo) || (!vivo && checkVivo)) {
+                    ffmpeg.kill('SIGKILL');
+                    clearInterval(monitor);
+                }
             }, 5000);
-
-            ffmpeg.on("close", () => clearInterval(checkInterval));
         });
 
-        await new Promise(r => setTimeout(r, 2000)); 
+        await new Promise(r => setTimeout(r, 1500)); 
     }
 }
 
 motorCanalC();
-app.listen(port, () => console.log(`Servidor en puerto ${port}`));
+app.listen(port, () => console.log(`Streaming listo en puerto ${port}`));
