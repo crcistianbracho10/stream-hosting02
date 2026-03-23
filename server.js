@@ -1,132 +1,138 @@
 const { spawn, exec } = require('child_process');
 const express = require('express');
-const axios = require('axios');
+const axios = require('axios'); 
 const app = express();
 const port = process.env.PORT || 3001;
 
-const PLAYLIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/6e4a07d268460ea807abf28f77c3880e/raw";
-const RTMP_DESTINO = "rtmp://live.restream.io/live/re_8275433_event74378d151bdc489d857a4212c6a591cd";
+const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
+const GIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/6e4a07d268460ea807abf28f77c3880e/raw";
 
-// Función para logs con hora
-function log(msg) {
-    console.log(`[${new Date().toLocaleString()}] ${msg}`);
+let playlist = [];
+let indiceActual = 0;
+
+function corregirUrl(url) {
+    if (url.includes("dropbox.com")) {
+        return url.replace(/www\.dropbox\.com/, "dl.dropboxusercontent.com").replace(/\?dl=0/, "").replace(/\?dl=1/, "");
+    }
+    return url;
 }
 
-// Descargar playlist
-async function obtenerPlaylist() {
+async function cargarPlaylistSegura() {
     try {
-        const respuesta = await axios.get(PLAYLIST_URL, { headers: { "Cache-Control": "no-cache" } });
-        log("📥 Playlist actualizada desde Gist");
-        return respuesta.data;
-    } catch (error) {
-        log("❌ Error cargando playlist: " + error.message);
-        return [];
-    }
+        const response = await axios.get(`${GIST_URL}?nocache=${Date.now()}`);
+        const nuevaLista = Array.isArray(response.data) ? response.data : JSON.parse(response.data);
+        if (nuevaLista.length > 0) {
+            playlist = nuevaLista;
+            if (indiceActual >= playlist.length) indiceActual = 0;
+        }
+    } catch (e) { console.error("❌ Error Gist."); }
 }
 
-// Horarios especiales
-function horaVE() { return (new Date().getUTCHours() - 4 + 24) % 24; }
-function diaVE() { return new Date().getUTCDay(); }
-function esHorarioCanal11() { return diaVE() >= 1 && diaVE() <= 5 && horaVE() >= 6 && horaVE() < 8; }
-function esHorarioCanal11Tarde() { return diaVE() >= 1 && diaVE() <= 5 && horaVE() >= 13 && horaVE() < 15; }
-function esHorarioTVES() { return (horaVE() >= 23 || horaVE() < 4); }
-function esSeisAM() { return horaVE() === 6 && new Date().getUTCMinutes() === 0; }
+async function prepararAssets() {
+    await new Promise(resolve => exec('curl -L -s -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&dl=1"', resolve));
+}
 
-async function iniciarMotor() {
-    log("🚀 Iniciando transmisión Canal C Full HD...");
+function obtenerVivo() {
+    const ahora = new Date();
+    const utc = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+    const fechaVE = new Date(utc + (3600000 * -4)); 
+    const h = fechaVE.getHours();
+    const m = fechaVE.getMinutes();
+    const s = fechaVE.getSeconds();
+    const d = fechaVE.getDay();
 
-    // Descargar logo
-    await new Promise(resolve => {
-        exec('curl -L -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&st=d3zoo3t8&dl=1"', resolve);
-    });
+    // Validamos que sea antes del minuto 58:00 exacto
+    const esAntesDelCierre = (m < 58);
 
-    let ultimoVideo = null;
+    // Lunes a Viernes: Canal 11 Zulia -> LOGO IZQUIERDA
+    if (d >= 1 && d <= 5) {
+        if ((h === 6 || h === 13) && esAntesDelCierre) {
+            return { url: "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8", title: "Canal 11 Zulia", logoDer: false };
+        }
+    }
+    // TeleSUR -> LOGO DERECHA
+    if ((h === 8 || h === 18) && esAntesDelCierre) {
+        return { url: "https://mblesmain01.telesur.ultrabase.net/mbliveMain/hd/chunklist.m3u8", title: "TeleSUR", logoDer: true };
+    }
+    // TVES -> LOGO IZQUIERDA (Desde las 11:00 PM hasta las 3:57:59 AM)
+    if (((h >= 23) || (h < 3) || (h === 3 && esAntesDelCierre))) {
+        return { url: "https://vs20.live.opencaster.com/tves_5fd18b1e/index.m3u8", title: "TVES", logoDer: false };
+    }
+    
+    return null;
+}
 
+async function motorCanalC() {
+    await prepararAssets();
+    
     while (true) {
-        const playlist = await obtenerPlaylist();
-        if (!playlist.length) {
-            log("⚠️ Playlist vacía, esperando 10 segundos...");
-            await new Promise(r => setTimeout(r, 10000));
-            continue;
+        await cargarPlaylistSegura();
+        const vivo = obtenerVivo();
+        const video = vivo || playlist[indiceActual];
+        
+        if (!video) { 
+            await new Promise(r => setTimeout(r, 1000)); 
+            continue; 
         }
 
-        for (const item of playlist) {
-            let videoURL = item.url;
-            const duracion = item.duration || 0;
+        const esVivo = !!vivo;
+        let xPos = esVivo ? (video.logoDer ? "main_w-overlay_w-200" : "200") : "main_w-overlay_w-200";
 
-            if (!videoURL) {
-                log("⚠️ Item inválido, saltando...");
-                continue;
+        const urlFinal = corregirUrl(video.url);
+        console.log(`\n🕒 [${new Date().toLocaleTimeString()}] TRANSMITIENDO: ${video.title}`);
+
+        const args = [
+            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
+            '-fflags', '+genpts+igndts+discardcorrupt', 
+            '-re', '-i', urlFinal, 
+            '-i', 'logo.png',
+            '-filter_complex', 
+            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` +
+            `[1:v]scale=250:250[logo];` +
+            `[bg][logo]overlay=${xPos}:90,format=yuv420p[v];` +
+            `[0:a]aresample=async=1:min_comp=0.01[a]`,
+            '-map', '[v]', '-map', '[a]',
+            '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+            '-b:v', '2000k', '-maxrate', '2500k', '-bufsize', '4000k', 
+            '-g', '48', '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
+            '-f', 'flv', RTMP_DESTINO
+        ];
+
+        const ffmpeg = spawn('ffmpeg', args);
+        let ultimoUpdate = Date.now();
+        
+        ffmpeg.stderr.on('data', (data) => {
+            if (data.toString().includes("frame=")) ultimoUpdate = Date.now();
+        });
+
+        const watchdog = setInterval(() => {
+            const chequeo = obtenerVivo();
+            
+            // CAMBIO DE GOLPE: 
+            // Si estamos en playlist y toca VIVO -> MATAR
+            // Si estamos en VIVO y toca PLAYLIST (minuto 58) -> MATAR
+            if ((!esVivo && chequeo) || (esVivo && (!chequeo || chequeo.title !== video.title))) {
+                console.log("🔄 INTERRUPCIÓN HORARIA: Cambiando señal ahora mismo...");
+                ffmpeg.kill('SIGKILL');
             }
 
-            // Horarios especiales
-            if (esHorarioCanal11() || esHorarioCanal11Tarde()) {
-                log("📺 Horario Canal 11 activo");
-                videoURL = "https://tv.streamcasthd.com:3676/live/canal11delzulialive.m3u8";
-            } else if (esHorarioTVES()) {
-                log("📺 Horario TVES activo");
-                videoURL = "https://vs20.live.opencaster.com/tves_5fd18b1e/index.m3u8";
+            if (Date.now() - ultimoUpdate > 15000) {
+                console.log("⚠️ Señal perdida, reintentando...");
+                ffmpeg.kill('SIGKILL');
             }
+        }, 1000); // Chequeo cada segundo para no perder la marca de las :00 o :58
 
-            if (videoURL === ultimoVideo) {
-                log("⏭️ Video repetido, pasando...");
-                continue;
-            }
-
-            log(`🎥 Transmitiendo: ${item.title}`);
-
-            let xLogo = 180, yLogo = 70;
-            if (esHorarioCanal11() || esHorarioCanal11Tarde() || esHorarioTVES() || esSeisAM()) {
-                xLogo = "W-w-180";
-            }
-
-            let filtro = "[0:v]scale=1920:1080,setsar=1[base];" +
-                         "[1:v]scale=260:260:flags=lanczos,setsar=1[logo];" +
-                         `[base][logo]overlay=${xLogo}:${yLogo}[outv];`;
-
-            if (esHorarioCanal11() || esHorarioCanal11Tarde()) {
-                filtro += "[outv]drawtext=text='Cortesía Canal 11 del Zulia':" +
-                          "fontcolor=white:fontsize=32:borderw=2:shadowcolor=black:shadowx=2:shadowy=2:" +
-                          "x=W-tw-40:y=H-th-40[outv2];[outv2]format=yuv420p[outv_final]";
-            } else {
-                filtro += "[outv]format=yuv420p[outv_final]";
-            }
-
-            const ffmpegArgs = [
-                '-re', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-                '-i', videoURL,
-                '-i', 'logo.png',
-                '-filter_complex', filtro,
-                '-map', '[outv_final]',
-                '-map', '0:a?',
-                '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-                '-b:v', '2500k', '-maxrate', '2500k', '-bufsize', '5000k',
-                '-pix_fmt', 'yuv420p', '-g', '60',
-                '-c:a', 'aac', '-b:a', '96k', '-ar', '44100',
-                '-s', '1280x720',
-                '-f', 'flv', RTMP_DESTINO
-            ];
-
-            if (duracion > 0) ffmpegArgs.push("-t", String(duracion));
-
-            const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-
-            ffmpeg.stderr.on("data", data => {
-                const msg = data.toString();
-                if (/Error|Invalid|failed/i.test(msg)) {
-                    log("❌ FFmpeg error, saltando...");
-                    ffmpeg.kill("SIGKILL");
-                }
+        await new Promise((resolve) => {
+            ffmpeg.on("close", () => {
+                clearInterval(watchdog);
+                if (!esVivo) indiceActual = (indiceActual + 1) % playlist.length;
+                resolve();
             });
+        });
 
-            await new Promise(resolve => ffmpeg.on('close', resolve));
-            ultimoVideo = videoURL;
-            log("➡️ Video terminado, siguiente...");
-        }
+        await new Promise(r => setTimeout(r, 500)); 
     }
 }
 
-iniciarMotor();
-
-app.get('/', (req, res) => res.send('✅ Transmisión Canal C Activa 24/7 en Full HD'));
-app.listen(port, () => log(`Servidor Express escuchando en puerto ${port}`));
+motorCanalC();
+app.listen(port, () => console.log(`Sistema listo en puerto ${port}`));
