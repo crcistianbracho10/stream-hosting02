@@ -5,6 +5,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 const RTMP_DESTINO = "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442";
+const RTMP_TULIX = "rtmp://canalctv1234:2k.ww7eGccgT@.d@36bay2.tulix.tv/giatv-canalctv1234/canalctv1234";
 const GIST_URL = "https://gist.githubusercontent.com/crcistianbracho10/6e4a07d268460ea807abf28f77c3880e/raw";
 const M3U8_URL = "https://vs20.live.opencaster.com/cristianhilos_314b91b0/index.m3u8";
 
@@ -118,6 +119,7 @@ async function motorCanalC() {
             '-b:v', '1800k', '-maxrate', '2000k', '-bufsize', '4000k', 
             '-g', '48', '-c:a', 'aac', '-b:a', '128k',
             '-f', 'flv', RTMP_DESTINO
+            '-f', 'flv', RTMP_TULIX
         ];
 
         const ffmpeg = spawn('ffmpeg', args);
