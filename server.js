@@ -56,7 +56,7 @@ function iniciarHLS() {
 }
 
 // ==========================================
-// 📺 MOTOR PRINCIPAL
+// 📺 MOTOR PRINCIPAL OPTIMIZADO EN TRANSMISIÓN
 // ==========================================
 function corregirUrl(url) {
     if (url.includes("dropbox.com")) {
@@ -131,13 +131,18 @@ async function motorCanalC() {
             '-re', '-i', urlFinal,
             '-i', 'Canal_C.png', 
             '-filter_complex',
-            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` +
+            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` + // 💻 Mantiene tus 1080p intactos
             `[1:v]scale=250:250[logo];` +
             `[bg][logo]overlay=${xPos}:90,format=yuv420p[v];` +
             `[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]`,
             '-map', '[v]', '-map', '[a]',
-            '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-            '-b:v', '2000k', '-maxrate', '2500k', '-bufsize', '4000k',
+            // 🔥 CAMBIOS DE OPTIMIZACIÓN DE FLUJO:
+            '-c:v', 'libx264', 
+            '-preset', 'ultrafast',     // 🚀 Obligatorio para que Render no trabe el empaquetado del video
+            '-tune', 'zerolatency',     // Eliminación de retraso en la conversión
+            '-b:v', '2000k', 
+            '-maxrate', '2000k',        // 🚀 Aplanamos la tasa de bits para evitar picos de red inestables
+            '-bufsize', '2000k',        // 🚀 Sincronizado para transmisión constante sin almacenamiento en búfer lento
             '-g', '48',
             '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
             '-f', 'mpegts', 'udp://127.0.0.1:9999?pkt_size=1316'
