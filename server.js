@@ -4,7 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const app = report === undefined ? express() : express(); 
+const app = express();
 const port = process.env.PORT || 7860; 
 
 // Carpeta HLS local dentro del contenedor de Render
@@ -29,18 +29,18 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 🎬 GENERADOR HLS OPTIMIZADO (COINCIDENCIA DE TIEMPO EXACTA)
+// 🎬 GENERADOR HLS (TIEMPOS CORREGIDOS Y BUFFER SINCRONIZADO)
 // ==========================================
 function iniciarHLS() {
     console.log("🎬 [HLS] Generando M3U8 privado en Render...");
     const hls = spawn('ffmpeg', [
-        '-i', 'udp://127.0.0.1:9999?buffer_size=5000000', // 🚀 Búfer ampliado para que Render no tire paquetes de red
+        '-i', 'udp://127.0.0.1:9999?buffer_size=5000000', // 🚀 Búfer UDP ampliado para asimilar los 1080p sin perder datos
         '-c:v', 'copy',
         '-c:a', 'copy',
         '-f', 'hls',
-        '-hls_time', '2',            // 🔑 CAMBIADO A 2 SEGUNDOS: Coincide exactamente con el Keyframe (-g 48 / 24fps)
+        '-hls_time', '2',            // 🔑 CAMBIADO A 2 SEGUNDOS: Cuadra perfecto con los keyframes del motor principal (-g 48 / 24fps)
         '-hls_list_size', '6',
-        '-hls_flags', 'delete_segments+split_by_time', // 🔑 Fuerza el corte en el tiempo exacto sin retrasos
+        '-hls_flags', 'delete_segments+split_by_time', // 🔑 Fuerza cortes limpios en el tiempo exacto sin congelamientos
         path.join(hlsFolder, 'index.m3u8')
     ]);
 
@@ -125,25 +125,27 @@ async function motorCanalC() {
 
         console.log(`\n📺 AIRE: ${video.title}`);
 
+        // Separamos la cadena para asegurar compatibilidad estricta con Render y Node
+        const filterComplexString = `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` +
+                                    `[1:v]scale=250:250[logo];` +
+                                    `[bg][logo]overlay=${xPos}:90,format=yuv420p[v];` +
+                                    `[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]`;
+
         const args = [
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '2',
             '-fflags', '+genpts+igndts+discardcorrupt',
             '-re', '-i', urlFinal,
             '-i', 'Canal_C.png', 
-            '-filter_complex',
-            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` + // 💻 Calidad Full HD 1080p intacta
-            `[1:v]scale=250:250[logo];` +
-            `[bg][logo]overlay=${xPos}:90,format=yuv420p[v];` +
-            `[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]`,
+            '-filter_complex', filterComplexString,
             '-map', '[v]', '-map', '[a]',
             '-c:v', 'libx264', 
             '-preset', 'ultrafast',     
             '-tune', 'zerolatency',     
             '-b:v', '2000k', 
             '-maxrate', '2000k',        
-            '-bufsize', '4000k',        // 🚀 Ajustado el tamaño del búfer de transmisión para dar holgura a la red
-            '-g', '48',                 // 🔑 Genera un fotograma clave exacto cada 2 segundos (48 frames / 24 fps)
-            '-sc_threshold', '0',       // 🚀 Desactiva la creación de fotogramas clave extra por cambios bruscos de color
+            '-bufsize', '4000k',        // 🚀 Búfer duplicado para dar holgura a la lectura en el almacenamiento lento de Render
+            '-g', '48',                 // 🔑 Keyframe fijo cada 2 segundos exactos (48 frames / 24 fps)
+            '-sc_threshold', '0',       // 🚀 Desactiva keyframes fantasmas en cambios bruscos de escena para evitar saltos en HLS
             '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
             '-f', 'mpegts', 'udp://127.0.0.1:9999?pkt_size=1316'
         ];
