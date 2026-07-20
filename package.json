@@ -1,12 +1,13 @@
 {
-  "name": "canal-c-stream",
+  "name": "canal-c-render",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "Streaming 24/7 de Canal C",
+  "main": "app.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.4.0",
     "express": "^4.18.2"
   }
 }
