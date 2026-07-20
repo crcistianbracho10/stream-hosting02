@@ -4,7 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const app = express();
+const app = report === undefined ? express() : express(); 
 const port = process.env.PORT || 7860; 
 
 // Carpeta HLS local dentro del contenedor de Render
@@ -29,18 +29,18 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 🎬 GENERADOR HLS (SIN CPU EXTRA)
+// 🎬 GENERADOR HLS OPTIMIZADO (COINCIDENCIA DE TIEMPO EXACTA)
 // ==========================================
 function iniciarHLS() {
     console.log("🎬 [HLS] Generando M3U8 privado en Render...");
     const hls = spawn('ffmpeg', [
-        '-i', 'udp://127.0.0.1:9999?buffer_size=2000000',
+        '-i', 'udp://127.0.0.1:9999?buffer_size=5000000', // 🚀 Búfer ampliado para que Render no tire paquetes de red
         '-c:v', 'copy',
         '-c:a', 'copy',
         '-f', 'hls',
-        '-hls_time', '4',
+        '-hls_time', '2',            // 🔑 CAMBIADO A 2 SEGUNDOS: Coincide exactamente con el Keyframe (-g 48 / 24fps)
         '-hls_list_size', '6',
-        '-hls_flags', 'delete_segments',
+        '-hls_flags', 'delete_segments+split_by_time', // 🔑 Fuerza el corte en el tiempo exacto sin retrasos
         path.join(hlsFolder, 'index.m3u8')
     ]);
 
@@ -131,19 +131,19 @@ async function motorCanalC() {
             '-re', '-i', urlFinal,
             '-i', 'Canal_C.png', 
             '-filter_complex',
-            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` + // 💻 Mantiene tus 1080p intactos
+            `[0:v]fps=24,scale=1920:1080:flags=lanczos,setsar=1[bg];` + // 💻 Calidad Full HD 1080p intacta
             `[1:v]scale=250:250[logo];` +
             `[bg][logo]overlay=${xPos}:90,format=yuv420p[v];` +
             `[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]`,
             '-map', '[v]', '-map', '[a]',
-            // 🔥 CAMBIOS DE OPTIMIZACIÓN DE FLUJO:
             '-c:v', 'libx264', 
-            '-preset', 'ultrafast',     // 🚀 Obligatorio para que Render no trabe el empaquetado del video
-            '-tune', 'zerolatency',     // Eliminación de retraso en la conversión
+            '-preset', 'ultrafast',     
+            '-tune', 'zerolatency',     
             '-b:v', '2000k', 
-            '-maxrate', '2000k',        // 🚀 Aplanamos la tasa de bits para evitar picos de red inestables
-            '-bufsize', '2000k',        // 🚀 Sincronizado para transmisión constante sin almacenamiento en búfer lento
-            '-g', '48',
+            '-maxrate', '2000k',        
+            '-bufsize', '4000k',        // 🚀 Ajustado el tamaño del búfer de transmisión para dar holgura a la red
+            '-g', '48',                 // 🔑 Genera un fotograma clave exacto cada 2 segundos (48 frames / 24 fps)
+            '-sc_threshold', '0',       // 🚀 Desactiva la creación de fotogramas clave extra por cambios bruscos de color
             '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
             '-f', 'mpegts', 'udp://127.0.0.1:9999?pkt_size=1316'
         ];
